@@ -1,0 +1,11 @@
+# OS generated files
+Thumbs.db
+.DS_Store
+
+# Python cache
+__pycache__/
+*.pyc
+
+# Local environments / IDEs
+.vscode/
+.idea/

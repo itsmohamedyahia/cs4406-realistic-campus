@@ -1,0 +1,995 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+  <title>Realistic Virtual Campus Exploration - Three.js Graphics Pipeline</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      overflow: hidden;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+      background: #090d16;
+      color: #f8fafc;
+      user-select: none;
+    }
+    #canvas-container {
+      width: 100vw;
+      height: 100vh;
+      position: absolute;
+      top: 0;
+      left: 0;
+    }
+
+    /* Top Glassmorphic Mode Control Bar */
+    #mode-bar {
+      position: absolute;
+      top: 16px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: rgba(15, 23, 42, 0.78);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      padding: 6px 10px;
+      border-radius: 40px;
+      border: 1px solid rgba(255, 255, 255, 0.15);
+      display: flex;
+      gap: 6px;
+      z-index: 30;
+      box-shadow: 0 12px 32px rgba(0, 0, 0, 0.55), inset 0 1px 0 rgba(255, 255, 255, 0.1);
+    }
+    .mode-btn {
+      background: rgba(30, 41, 59, 0.6);
+      color: #94a3b8;
+      border: 1px solid rgba(255, 255, 255, 0.06);
+      padding: 8px 15px;
+      border-radius: 20px;
+      font-size: 12px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      white-space: nowrap;
+    }
+    .mode-btn:hover {
+      background: rgba(51, 65, 85, 0.9);
+      color: #f8fafc;
+      border-color: rgba(255, 255, 255, 0.25);
+      transform: translateY(-1px);
+    }
+    .mode-btn.active {
+      background: linear-gradient(135deg, #0284c7, #0369a1);
+      color: #ffffff;
+      border-color: #38bdf8;
+      box-shadow: 0 4px 15px rgba(2, 132, 199, 0.45);
+    }
+    .mode-btn.active.btn-err {
+      background: linear-gradient(135deg, #dc2626, #b91c1c);
+      border-color: #f87171;
+      box-shadow: 0 4px 15px rgba(220, 38, 38, 0.45);
+    }
+    .mode-btn.active.btn-fix {
+      background: linear-gradient(135deg, #16a34a, #15803d);
+      border-color: #4ade80;
+      box-shadow: 0 4px 15px rgba(22, 163, 74, 0.45);
+    }
+
+    /* Floating Telemetry & Pipeline Inspector HUD */
+    #hud-panel {
+      position: absolute;
+      top: 16px;
+      right: 18px;
+      background: rgba(15, 23, 42, 0.85);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      padding: 16px 20px;
+      border-radius: 14px;
+      border: 1px solid rgba(255, 255, 255, 0.14);
+      font-size: 12px;
+      z-index: 20;
+      width: 350px;
+      box-shadow: 0 16px 36px rgba(0, 0, 0, 0.5);
+    }
+    #hud-panel h2 {
+      font-size: 13.5px;
+      letter-spacing: 0.5px;
+      color: #38bdf8;
+      margin-bottom: 10px;
+      border-bottom: 1px solid rgba(51, 65, 85, 0.8);
+      padding-bottom: 6px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .panel-badge {
+      display: inline-block;
+      padding: 3px 9px;
+      border-radius: 6px;
+      font-size: 10.5px;
+      font-weight: 800;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+    .badge-persp { background: #0284c7; color: #ffffff; }
+    .badge-ortho { background: #d97706; color: #ffffff; }
+    .badge-error { background: #dc2626; color: #ffffff; }
+    .badge-fixed { background: #16a34a; color: #ffffff; }
+
+    .telemetry-row {
+      display: flex;
+      justify-content: space-between;
+      margin-bottom: 5px;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+      font-size: 11.5px;
+    }
+    .telemetry-label { color: #94a3b8; }
+    .telemetry-val { color: #f1f5f9; font-weight: 600; }
+    .explanation-box {
+      margin-top: 12px;
+      padding: 10px 12px;
+      background: rgba(30, 41, 59, 0.8);
+      border-left: 3px solid #38bdf8;
+      border-radius: 6px;
+      font-size: 11.5px;
+      line-height: 1.5;
+      color: #cbd5e1;
+    }
+    .instructions-tag {
+      margin-top: 10px;
+      font-size: 10.5px;
+      color: #64748b;
+      text-align: center;
+      line-height: 1.4;
+    }
+
+    /* Cinematic Brand Tag */
+    #brand-tag {
+      position: absolute;
+      bottom: 16px;
+      left: 18px;
+      background: rgba(15, 23, 42, 0.75);
+      backdrop-filter: blur(10px);
+      padding: 8px 14px;
+      border-radius: 8px;
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      font-size: 11px;
+      color: #94a3b8;
+      z-index: 20;
+    }
+    #brand-tag strong { color: #38bdf8; }
+  </style>
+
+  <script type="importmap">
+    {
+      "imports": {
+        "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+        "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+      }
+    }
+  </script>
+</head>
+<body>
+
+  <!-- Top Mode Switcher Bar -->
+  <div id="mode-bar">
+    <button class="mode-btn active" id="btn-overview">🌐 Overview</button>
+    <button class="mode-btn" id="btn-walkthrough">🚶 Campus Stroll</button>
+    <button class="mode-btn" id="btn-perspective">📐 Perspective</button>
+    <button class="mode-btn" id="btn-orthographic">📏 Orthographic</button>
+    <button class="mode-btn" id="btn-clipping">✂️ Frustum Clipping</button>
+    <button class="mode-btn" id="btn-depth_error">❌ Overlap Defect</button>
+    <button class="mode-btn" id="btn-depth_fixed">✅ Z-Buffer Resolved</button>
+  </div>
+
+  <div id="canvas-container"></div>
+
+  <!-- Telemetry and Concept HUD -->
+  <div id="hud-panel">
+    <h2>
+      <span>Graphics Pipeline Telemetry</span>
+      <span id="mode-badge" class="panel-badge badge-persp">Overview</span>
+    </h2>
+    <div class="telemetry-row">
+      <span class="telemetry-label">Camera Eye (e):</span>
+      <span class="telemetry-val" id="tele-pos">(28.0, 32.0, 48.0)</span>
+    </div>
+    <div class="telemetry-row">
+      <span class="telemetry-label">LookAt Target (t):</span>
+      <span class="telemetry-val" id="tele-target">(0.0, 3.5, -5.0)</span>
+    </div>
+    <div class="telemetry-row">
+      <span class="telemetry-label">Projection Mode:</span>
+      <span class="telemetry-val" id="tele-proj">Perspective (FOV: 55°)</span>
+    </div>
+    <div class="telemetry-row">
+      <span class="telemetry-label">Clipping Frustum:</span>
+      <span class="telemetry-val" id="tele-clip">Near: 0.5m | Far: 180m</span>
+    </div>
+    <div class="telemetry-row">
+      <span class="telemetry-label">Hardware Z-Buffer:</span>
+      <span class="telemetry-val" id="tele-depth">Active (24-bit Z-Test)</span>
+    </div>
+    <div class="telemetry-row">
+      <span class="telemetry-label">Viewport (Screen):</span>
+      <span class="telemetry-val" id="tele-vp">1920 × 1080</span>
+    </div>
+    <div class="telemetry-row">
+      <span class="telemetry-label">Rendering Frame Rate:</span>
+      <span class="telemetry-val" id="tele-fps">60 FPS</span>
+    </div>
+    <div class="explanation-box" id="tele-desc">
+      Viewing transformation converts world coordinates into viewer-centered eye space using the view matrix V = M_cam^-1.
+    </div>
+    <div class="instructions-tag">
+      🖱️ Left-Click + Drag: Orbit Camera | Scroll: Zoom | Right-Click: Pan
+    </div>
+  </div>
+
+  <div id="brand-tag">
+    <strong>CS 4406: Computer Graphics</strong> | Production Three.js Campus Exploration
+  </div>
+
+  <script type="module">
+    import * as THREE from 'three';
+    import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+    import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
+
+    // Container & dimensions
+    const container = document.getElementById('canvas-container');
+    let width = window.innerWidth;
+    let height = window.innerHeight;
+
+    // Renderer with production graphics configuration
+    const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
+    renderer.setSize(width, height);
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    renderer.toneMappingExposure = 1.05;
+    renderer.shadowMap.enabled = true;
+    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    renderer.outputColorSpace = THREE.SRGBColorSpace;
+    container.appendChild(renderer.domElement);
+
+    // Scene & Environment
+    const scene = new THREE.Scene();
+    scene.background = new THREE.Color(0x9bd4f5); // Soft atmospheric sky blue
+    scene.fog = new THREE.FogExp2(0x9bd4f5, 0.007);
+
+    // Environment Lighting (RoomEnvironment PMREM)
+    const pmremGenerator = new THREE.PMREMGenerator(renderer);
+    pmremGenerator.compileEquirectangularShader();
+    scene.environment = pmremGenerator.fromScene(new RoomEnvironment(renderer), 0.04).texture;
+
+    // Direct Sun Light with Shadow Mapping
+    const sunLight = new THREE.DirectionalLight(0xfffaed, 2.2);
+    sunLight.position.set(45, 75, 40);
+    sunLight.castShadow = true;
+    sunLight.shadow.mapSize.width = 2048;
+    sunLight.shadow.mapSize.height = 2048;
+    sunLight.shadow.camera.near = 10;
+    sunLight.shadow.camera.far = 180;
+    const d = 55;
+    sunLight.shadow.camera.left = -d;
+    sunLight.shadow.camera.right = d;
+    sunLight.shadow.camera.top = d;
+    sunLight.shadow.camera.bottom = -d;
+    sunLight.shadow.bias = -0.0005;
+    scene.add(sunLight);
+
+    // Ambient Sky Fill
+    const hemiLight = new THREE.HemisphereLight(0xffffff, 0x445566, 0.6);
+    hemiLight.position.set(0, 50, 0);
+    scene.add(hemiLight);
+
+    // ==========================================
+    // PROCEDURAL TEXTURE GENERATION
+    // ==========================================
+    function createGrassTexture() {
+      const c = document.createElement('canvas');
+      c.width = 512; c.height = 512;
+      const ctx = c.getContext('2d');
+      ctx.fillStyle = '#489c44';
+      ctx.fillRect(0, 0, 512, 512);
+      // Multi-frequency noise
+      for (let i = 0; i < 40000; i++) {
+        const x = Math.random() * 512;
+        const y = Math.random() * 512;
+        const shade = Math.floor(Math.random() * 40 - 20);
+        ctx.fillStyle = `rgb(${72 + shade}, ${156 + shade}, ${68 + shade})`;
+        ctx.fillRect(x, y, 2.5, 2.5);
+      }
+      const tex = new THREE.CanvasTexture(c);
+      tex.wrapS = THREE.RepeatWrapping;
+      tex.wrapT = THREE.RepeatWrapping;
+      tex.repeat.set(16, 16);
+      return tex;
+    }
+
+    function createPaversTexture() {
+      const c = document.createElement('canvas');
+      c.width = 512; c.height = 512;
+      const ctx = c.getContext('2d');
+      ctx.fillStyle = '#d5d8dc';
+      ctx.fillRect(0, 0, 512, 512);
+      const tileSize = 64;
+      ctx.strokeStyle = '#9aa0a6';
+      ctx.lineWidth = 3;
+      for (let x = 0; x <= 512; x += tileSize) {
+        ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, 512); ctx.stroke();
+      }
+      for (let y = 0; y <= 512; y += tileSize) {
+        ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(512, y); ctx.stroke();
+      }
+      // Fine stone grain
+      for (let i = 0; i < 15000; i++) {
+        const x = Math.random() * 512;
+        const y = Math.random() * 512;
+        const lum = Math.floor(Math.random() * 30 - 15);
+        ctx.fillStyle = `rgba(0,0,0,${Math.random() * 0.08})`;
+        ctx.fillRect(x, y, 3, 3);
+      }
+      const tex = new THREE.CanvasTexture(c);
+      tex.wrapS = THREE.RepeatWrapping;
+      tex.wrapT = THREE.RepeatWrapping;
+      tex.repeat.set(4, 16);
+      return tex;
+    }
+
+    function createBrickTexture() {
+      const c = document.createElement('canvas');
+      c.width = 512; c.height = 512;
+      const ctx = c.getContext('2d');
+      ctx.fillStyle = '#8b2e2b';
+      ctx.fillRect(0, 0, 512, 512);
+      const bW = 64, bH = 24;
+      ctx.strokeStyle = '#d5c4b1';
+      ctx.lineWidth = 3;
+      for (let y = 0, row = 0; y < 512; y += bH, row++) {
+        ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(512, y); ctx.stroke();
+        const offset = (row % 2 === 0) ? 0 : bW / 2;
+        for (let x = offset; x < 512 + bW; x += bW) {
+          ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x, y + bH); ctx.stroke();
+        }
+      }
+      const tex = new THREE.CanvasTexture(c);
+      tex.wrapS = THREE.RepeatWrapping;
+      tex.wrapT = THREE.RepeatWrapping;
+      tex.repeat.set(6, 4);
+      return tex;
+    }
+
+    // Material Library
+    const grassTex = createGrassTexture();
+    const paversTex = createPaversTexture();
+    const brickTex = createBrickTexture();
+
+    const matGrass = new THREE.MeshStandardMaterial({
+      map: grassTex,
+      roughness: 0.85,
+      metalness: 0.05
+    });
+
+    const matPavers = new THREE.MeshStandardMaterial({
+      map: paversTex,
+      roughness: 0.6,
+      metalness: 0.1
+    });
+
+    const matBrick = new THREE.MeshStandardMaterial({
+      map: brickTex,
+      roughness: 0.7,
+      metalness: 0.05
+    });
+
+    const matLimestone = new THREE.MeshStandardMaterial({
+      color: 0xf1efe7,
+      roughness: 0.45,
+      metalness: 0.05
+    });
+
+    const matDarkSlate = new THREE.MeshStandardMaterial({
+      color: 0x334155,
+      roughness: 0.35,
+      metalness: 0.2
+    });
+
+    const matCopperRoof = new THREE.MeshStandardMaterial({
+      color: 0x2e8b57,
+      roughness: 0.4,
+      metalness: 0.3
+    });
+
+    const matGlass = new THREE.MeshPhysicalMaterial({
+      color: 0x1e3a8a,
+      roughness: 0.05,
+      metalness: 0.1,
+      transmission: 0.6,
+      transparent: true,
+      opacity: 0.85,
+      reflectivity: 0.9,
+      ior: 1.52
+    });
+
+    const matWater = new THREE.MeshPhysicalMaterial({
+      color: 0x0284c7,
+      roughness: 0.1,
+      metalness: 0.1,
+      transmission: 0.75,
+      transparent: true,
+      opacity: 0.8,
+      ior: 1.33
+    });
+
+    // ==========================================
+    // CAMPUS ENVIRONMENT GEOMETRY
+    // ==========================================
+
+    // Ground Plane
+    const groundGeo = new THREE.PlaneGeometry(200, 200);
+    const ground = new THREE.Mesh(groundGeo, matGrass);
+    ground.rotation.x = -Math.PI / 2;
+    ground.receiveShadow = true;
+    scene.add(ground);
+
+    // Main Avenue Promenade
+    const promenadeGeo = new THREE.PlaneGeometry(22, 100);
+    const promenade = new THREE.Mesh(promenadeGeo, matPavers);
+    promenade.rotation.x = -Math.PI / 2;
+    promenade.position.set(0, 0.08, 5);
+    promenade.receiveShadow = true;
+    scene.add(promenade);
+
+    // Crosswalk Plaza
+    const crossGeo = new THREE.PlaneGeometry(80, 20);
+    const crossWalk = new THREE.Mesh(crossGeo, matPavers);
+    crossWalk.rotation.x = -Math.PI / 2;
+    crossWalk.position.set(0, 0.09, 0);
+    crossWalk.receiveShadow = true;
+    scene.add(crossWalk);
+
+    // Curb Borders
+    const curbMat = new THREE.MeshStandardMaterial({ color: 0x94a3b8, roughness: 0.7 });
+    function createCurb(x, z, w, l) {
+      const geo = new THREE.BoxGeometry(w, 0.25, l);
+      const m = new THREE.Mesh(geo, curbMat);
+      m.position.set(x, 0.12, z);
+      m.receiveShadow = true;
+      m.castShadow = true;
+      scene.add(m);
+    }
+    createCurb(-11.2, 5, 0.4, 100);
+    createCurb(11.2, 5, 0.4, 100);
+
+    // Central Tiered Fountain Plaza
+    const fountainGroup = new THREE.Group();
+    const basinGeo = new THREE.CylinderGeometry(5.5, 6.0, 0.8, 32);
+    const basin = new THREE.Mesh(basinGeo, matLimestone);
+    basin.position.y = 0.4;
+    basin.castShadow = true;
+    basin.receiveShadow = true;
+    fountainGroup.add(basin);
+
+    const waterGeo = new THREE.CylinderGeometry(5.1, 5.1, 0.75, 32);
+    const waterMesh = new THREE.Mesh(waterGeo, matWater);
+    waterMesh.position.y = 0.45;
+    fountainGroup.add(waterMesh);
+
+    const tier2Geo = new THREE.CylinderGeometry(2.6, 2.9, 0.6, 24);
+    const tier2 = new THREE.Mesh(tier2Geo, matLimestone);
+    tier2.position.y = 1.3;
+    tier2.castShadow = true;
+    fountainGroup.add(tier2);
+
+    const tier2Water = new THREE.CylinderGeometry(2.3, 2.3, 0.55, 24);
+    const tier2WaterMesh = new THREE.Mesh(tier2Water, matWater);
+    tier2WaterMesh.position.y = 1.35;
+    fountainGroup.add(tier2WaterMesh);
+
+    const centerPillarGeo = new THREE.CylinderGeometry(0.5, 0.8, 2.8, 16);
+    const centerPillar = new THREE.Mesh(centerPillarGeo, matLimestone);
+    centerPillar.position.y = 1.6;
+    centerPillar.castShadow = true;
+    fountainGroup.add(centerPillar);
+
+    fountainGroup.position.set(0, 0, 0);
+    scene.add(fountainGroup);
+
+    // ==========================================
+    // ARCHITECTURAL BUILDINGS
+    // ==========================================
+
+    // 1. Neoclassical Administration Palace (Center-Back, z = -36)
+    function createAdministrationBuilding() {
+      const building = new THREE.Group();
+
+      // Granite Plinth / Steps
+      const plinthGeo = new THREE.BoxGeometry(34, 1.4, 20);
+      const plinth = new THREE.Mesh(plinthGeo, matLimestone);
+      plinth.position.y = 0.7;
+      plinth.castShadow = true;
+      plinth.receiveShadow = true;
+      building.add(plinth);
+
+      // Front Grand Steps
+      for (let s = 1; s <= 4; s++) {
+        const stepGeo = new THREE.BoxGeometry(16, 0.35, 1.2 * s);
+        const step = new THREE.Mesh(stepGeo, matLimestone);
+        step.position.set(0, 0.18 * s, 10 + 0.6 * s);
+        step.castShadow = true;
+        step.receiveShadow = true;
+        building.add(step);
+      }
+
+      // Main Facade Core
+      const coreGeo = new THREE.BoxGeometry(30, 15, 16);
+      const core = new THREE.Mesh(coreGeo, matBrick);
+      core.position.y = 8.2;
+      core.castShadow = true;
+      core.receiveShadow = true;
+      building.add(core);
+
+      // Classical Portico Columns (6 Grand Columns)
+      for (let x = -6.5; x <= 6.5; x += 2.6) {
+        const colBase = new THREE.Mesh(new THREE.CylinderGeometry(0.55, 0.65, 0.5, 16), matLimestone);
+        colBase.position.set(x, 1.65, 8.6);
+        colBase.castShadow = true;
+        building.add(colBase);
+
+        const colShaft = new THREE.Mesh(new THREE.CylinderGeometry(0.42, 0.48, 11, 16), matLimestone);
+        colShaft.position.set(x, 7.2, 8.6);
+        colShaft.castShadow = true;
+        colShaft.receiveShadow = true;
+        building.add(colShaft);
+
+        const colCap = new THREE.Mesh(new THREE.BoxGeometry(1.1, 0.6, 1.1), matLimestone);
+        colCap.position.set(x, 12.9, 8.6);
+        colCap.castShadow = true;
+        building.add(colCap);
+      }
+
+      // Classical Triangular Pediment
+      const pedimentGeo = new THREE.ConeGeometry(9.5, 4.2, 4);
+      const pediment = new THREE.Mesh(pedimentGeo, matLimestone);
+      pediment.rotation.y = Math.PI / 4;
+      pediment.position.set(0, 15.3, 8.6);
+      pediment.castShadow = true;
+      building.add(pediment);
+
+      // Mansard Slate Roof
+      const roofGeo = new THREE.ConeGeometry(24, 6.5, 4);
+      const roof = new THREE.Mesh(roofGeo, matDarkSlate);
+      roof.rotation.y = Math.PI / 4;
+      roof.position.y = 18.8;
+      roof.castShadow = true;
+      building.add(roof);
+
+      // Central Cupola / Clock Tower
+      const cupolaBase = new THREE.Mesh(new THREE.BoxGeometry(4.5, 4.5, 4.5), matLimestone);
+      cupolaBase.position.y = 23.5;
+      cupolaBase.castShadow = true;
+      building.add(cupolaBase);
+
+      const domeGeo = new THREE.SphereGeometry(2.3, 16, 16, 0, Math.PI * 2, 0, Math.PI / 2);
+      const dome = new THREE.Mesh(domeGeo, matCopperRoof);
+      dome.position.y = 25.75;
+      dome.castShadow = true;
+      building.add(dome);
+
+      // Architectural Windows
+      const winGeo = new THREE.BoxGeometry(1.6, 2.8, 0.2);
+      for (let floor = 4; floor <= 12; floor += 4) {
+        for (let x = -12; x <= 12; x += 4) {
+          if (Math.abs(x) < 7 && floor === 4) continue; // Portico door
+          const win = new THREE.Mesh(winGeo, matGlass);
+          win.position.set(x, floor, 8.1);
+          building.add(win);
+        }
+      }
+
+      building.position.set(0, 0, -36);
+      return building;
+    }
+    scene.add(createAdministrationBuilding());
+
+    // 2. Modern Science & Innovation Complex (Left Wing, x = -32, z = -5)
+    function createScienceBuilding() {
+      const group = new THREE.Group();
+
+      // Main structural block
+      const mainGeo = new THREE.BoxGeometry(20, 13, 30);
+      const main = new THREE.Mesh(mainGeo, matDarkSlate);
+      main.position.y = 6.5;
+      main.castShadow = true;
+      main.receiveShadow = true;
+      group.add(main);
+
+      // Cantilevered glass volume
+      const glassBlockGeo = new THREE.BoxGeometry(20.5, 9.5, 24);
+      const glassBlock = new THREE.Mesh(glassBlockGeo, matGlass);
+      glassBlock.position.set(0, 7.5, 0);
+      group.add(glassBlock);
+
+      // Horizontal solar louvers / fins
+      const louverMat = new THREE.MeshStandardMaterial({ color: 0x94a3b8, metalness: 0.8, roughness: 0.2 });
+      for (let y = 4; y <= 11; y += 1.8) {
+        const louver = new THREE.Mesh(new THREE.BoxGeometry(21.2, 0.2, 25), louverMat);
+        louver.position.set(0, y, 0);
+        louver.castShadow = true;
+        group.add(louver);
+      }
+
+      // Rooftop HVAC units
+      const hvac = new THREE.Mesh(new THREE.BoxGeometry(5, 2.2, 7), louverMat);
+      hvac.position.set(-2, 14.1, 4);
+      hvac.castShadow = true;
+      group.add(hvac);
+
+      group.position.set(-32, 0, -5);
+      return group;
+    }
+    scene.add(createScienceBuilding());
+
+    // 3. Grand Memorial Library (Right Wing, x = 32, z = -5)
+    function createLibraryBuilding() {
+      const group = new THREE.Group();
+
+      const mainGeo = new THREE.BoxGeometry(20, 12, 28);
+      const main = new THREE.Mesh(mainGeo, matLimestone);
+      main.position.y = 6;
+      main.castShadow = true;
+      main.receiveShadow = true;
+      group.add(main);
+
+      // Arched Library Windows
+      for (let z = -10; z <= 10; z += 5) {
+        const win = new THREE.Mesh(new THREE.BoxGeometry(0.3, 5, 2.2), matGlass);
+        win.position.set(-10.1, 7, z);
+        group.add(win);
+      }
+
+      // Standing Seam Copper Pitch Roof
+      const roofGeo = new THREE.ConeGeometry(17, 6.5, 4);
+      const roof = new THREE.Mesh(roofGeo, matCopperRoof);
+      roof.rotation.y = Math.PI / 4;
+      roof.position.y = 15.2;
+      roof.castShadow = true;
+      group.add(roof);
+
+      group.position.set(32, 0, -5);
+      return group;
+    }
+    scene.add(createLibraryBuilding());
+
+    // ==========================================
+    // DETAILED PROPS & FOLIAGE
+    // ==========================================
+
+    // Realistic Deciduous Tree with Tiered Organic Canopy
+    function createRealisticTree(scale = 1.0) {
+      const tree = new THREE.Group();
+      // Trunk with natural flare
+      const trunkGeo = new THREE.CylinderGeometry(0.35 * scale, 0.6 * scale, 3.8 * scale, 10);
+      const trunk = new THREE.Mesh(trunkGeo, new THREE.MeshStandardMaterial({ color: 0x5c4033, roughness: 0.9 }));
+      trunk.position.y = 1.9 * scale;
+      trunk.castShadow = true;
+      trunk.receiveShadow = true;
+      tree.add(trunk);
+
+      // Multi-cluster foliage
+      const leafMat = new THREE.MeshStandardMaterial({
+        color: 0x2e7d32,
+        roughness: 0.8,
+        flatShading: true
+      });
+
+      const clusterOffsets = [
+        [0, 4.2, 0, 2.4],
+        [-1.2, 4.8, 0.8, 1.8],
+        [1.1, 4.6, -0.7, 1.9],
+        [0.6, 5.4, 0.9, 1.6],
+        [-0.5, 5.6, -0.8, 1.5],
+        [0, 6.3, 0, 1.4]
+      ];
+
+      clusterOffsets.forEach(([cx, cy, cz, r]) => {
+        const sphere = new THREE.Mesh(new THREE.DodecahedronGeometry(r * scale, 1), leafMat);
+        sphere.position.set(cx * scale, cy * scale, cz * scale);
+        sphere.castShadow = true;
+        sphere.receiveShadow = true;
+        tree.add(sphere);
+      });
+
+      return tree;
+    }
+
+    // Streetlamps with active PointLights
+    const lampMat = new THREE.MeshStandardMaterial({ color: 0x1e293b, metalness: 0.8, roughness: 0.3 });
+    function createStreetLamp(x, z) {
+      const lamp = new THREE.Group();
+      const post = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.18, 5.5, 12), lampMat);
+      post.position.y = 2.75;
+      post.castShadow = true;
+      lamp.add(post);
+
+      const lantern = new THREE.Mesh(new THREE.BoxGeometry(0.6, 0.9, 0.6), matGlass);
+      lantern.position.y = 5.5;
+      lamp.add(lantern);
+
+      const cap = new THREE.Mesh(new THREE.ConeGeometry(0.6, 0.4, 4), lampMat);
+      cap.rotation.y = Math.PI / 4;
+      cap.position.y = 6.1;
+      lamp.add(cap);
+
+      const light = new THREE.PointLight(0xfffaed, 0.8, 16);
+      light.position.y = 5.5;
+      lamp.add(light);
+
+      lamp.position.set(x, 0, z);
+      return lamp;
+    }
+
+    // Trees placed strictly on open lawn zones with zero building wall or walkway clipping
+    const treeLocs = [
+      // Promenade Avenue flanks (south of crosswalk)
+      [-15, 16], [-15, 28], [-15, 40],
+      [15, 16], [15, 28], [15, 40],
+      // Science Building front lawn courtyard
+      [-28, 18], [-34, 28], [-24, 38],
+      // Library front lawn courtyard
+      [28, 18], [34, 28], [24, 38],
+      // North Promenade lawn flank (clear of pavilion & admin steps)
+      [-15, -15], [15, -15],
+      // Behind Science Building (north-west grounds)
+      [-30, -26], [-36, -34],
+      // Behind Library Building (north-east grounds)
+      [30, -26], [36, -34]
+    ];
+    treeLocs.forEach(([x, z]) => {
+      const t = createRealisticTree(1.15 + (Math.random() * 0.3));
+      t.position.set(x, 0, z);
+      scene.add(t);
+    });
+
+    // Streetlamps
+    const lampLocs = [
+      [-10.2, 18], [-10.2, -8],
+      [10.2, 18], [10.2, -8]
+    ];
+    lampLocs.forEach(([x, z]) => scene.add(createStreetLamp(x, z)));
+
+    // SPECIAL FOREGROUND TREE & BACKGROUND OBJECT FOR DEPTH BUFFER VERIFICATION
+    const fgTree = createRealisticTree(1.35);
+    fgTree.position.set(-2, 0, 13);
+    scene.add(fgTree);
+
+    // Distant Architectural Pavilion along the exact line of sight
+    const bgPavilionGeo = new THREE.BoxGeometry(11, 8.5, 9);
+    const bgPavilionMat = new THREE.MeshStandardMaterial({
+      color: 0x9333ea,
+      roughness: 0.3,
+      metalness: 0.4
+    });
+    const bgPavilion = new THREE.Mesh(bgPavilionGeo, bgPavilionMat);
+    bgPavilion.position.set(-2, 4.25, -15);
+    bgPavilion.castShadow = true;
+    bgPavilion.receiveShadow = true;
+    scene.add(bgPavilion);
+
+    // ==========================================
+    // CAMERAS, CONTROLS & PIPELINE INSPECTION
+    // ==========================================
+    const aspect = width / height;
+    const perspCam = new THREE.PerspectiveCamera(55, aspect, 0.5, 180);
+    const orthoDist = 32;
+    const orthoCam = new THREE.OrthographicCamera(
+      -orthoDist * aspect, orthoDist * aspect,
+      orthoDist, -orthoDist,
+      0.5, 180
+    );
+
+    let activeCamera = perspCam;
+
+    const controls = new OrbitControls(perspCam, renderer.domElement);
+    controls.enableDamping = true;
+    controls.dampingFactor = 0.05;
+    controls.maxPolarAngle = Math.PI / 2 - 0.02; // Prevent going beneath ground
+
+    // Frustum Visualizer
+    const dummyCam = new THREE.PerspectiveCamera(50, 1.4, 4, 32);
+    dummyCam.position.set(0, 5, 25);
+    dummyCam.lookAt(0, 5, -10);
+    const frustumHelper = new THREE.CameraHelper(dummyCam);
+    frustumHelper.visible = false;
+    scene.add(dummyCam);
+    scene.add(frustumHelper);
+
+    // ==========================================
+    // REAL-TIME MODE SWITCHER
+    // ==========================================
+    window.setMode = function(modeName) {
+      document.querySelectorAll('.mode-btn').forEach(btn => btn.classList.remove('active', 'btn-err', 'btn-fix'));
+      const activeBtn = document.getElementById('btn-' + modeName);
+      if (activeBtn) activeBtn.classList.add('active');
+
+      // Reset defaults
+      frustumHelper.visible = false;
+      renderer.sortObjects = true;
+      bgPavilion.material.depthTest = true;
+      bgPavilion.material.depthWrite = true;
+      fgTree.traverse(child => {
+        if (child.isMesh) {
+          child.renderOrder = 0;
+          child.material.depthTest = true;
+        }
+      });
+      bgPavilion.renderOrder = 0;
+      activeCamera = perspCam;
+      controls.object = perspCam;
+
+      const badge = document.getElementById('mode-badge');
+      const telePos = document.getElementById('tele-pos');
+      const teleTarget = document.getElementById('tele-target');
+      const teleProj = document.getElementById('tele-proj');
+      const teleClip = document.getElementById('tele-clip');
+      const teleDepth = document.getElementById('tele-depth');
+      const teleDesc = document.getElementById('tele-desc');
+
+      if (modeName === 'overview') {
+        badge.innerText = 'Overview';
+        badge.className = 'panel-badge badge-persp';
+        perspCam.position.set(28, 32, 48);
+        controls.target.set(0, 3.5, -5);
+        telePos.innerText = '(28.0, 32.0, 48.0)';
+        teleTarget.innerText = '(0.0, 3.5, -5.0)';
+        teleProj.innerText = 'Perspective (FOV: 55°)';
+        teleClip.innerText = 'Near: 0.5m | Far: 180m';
+        teleDepth.innerText = 'Active (24-bit Z-Test)';
+        teleDesc.innerText = 'Viewing transformation places eye at elevated position (28, 32, 48) looking toward plaza center (0, 3.5, -5), mapping all world entities to camera eye coordinates.';
+      } else if (modeName === 'walkthrough') {
+        badge.innerText = 'Walkthrough';
+        badge.className = 'panel-badge badge-persp';
+        perspCam.position.set(0, 2.5, 34);
+        controls.target.set(0, 3.5, -36);
+        telePos.innerText = '(0.0, 2.5, 34.0)';
+        teleTarget.innerText = '(0.0, 3.5, -36.0)';
+        teleProj.innerText = 'Perspective (FOV: 55°)';
+        teleClip.innerText = 'Near: 0.5m | Far: 180m';
+        teleDepth.innerText = 'Active (24-bit Z-Test)';
+        teleDesc.innerText = 'First-person ground promenade stroll: user moves along the central walkway, verifying that the view matrix continuously mirrors pedestrian gaze direction.';
+      } else if (modeName === 'perspective') {
+        badge.innerText = 'Perspective';
+        badge.className = 'panel-badge badge-persp';
+        perspCam.position.set(0, 3.5, 28);
+        controls.target.set(0, 4.0, -36);
+        telePos.innerText = '(0.0, 3.5, 28.0)';
+        teleTarget.innerText = '(0.0, 4.0, -36.0)';
+        teleProj.innerText = 'Perspective (FOV: 55°)';
+        teleClip.innerText = 'Near: 0.5m | Far: 180m';
+        teleDepth.innerText = 'Active (24-bit Z-Test)';
+        teleDesc.innerText = 'Perspective projection exhibits natural visual foreshortening: distant Administration Palace appears smaller than nearby trees, mirroring biological vision.';
+      } else if (modeName === 'orthographic') {
+        badge.innerText = 'Orthographic';
+        badge.className = 'panel-badge badge-ortho';
+        orthoCam.position.set(0, 3.5, 28);
+        orthoCam.lookAt(0, 4.0, -36);
+        activeCamera = orthoCam;
+        controls.object = orthoCam;
+        controls.target.set(0, 4.0, -36);
+        telePos.innerText = '(0.0, 3.5, 28.0)';
+        teleTarget.innerText = '(0.0, 4.0, -36.0)';
+        teleProj.innerText = 'Orthographic (Parallel Rays)';
+        teleClip.innerText = 'Near: 0.5m | Far: 180m';
+        teleDepth.innerText = 'Active (24-bit Z-Test)';
+        teleDesc.innerText = 'Orthographic projection maintains constant object scale regardless of distance. Notice Administration Palace appears unnaturally colossal, eliminating depth cues.';
+      } else if (modeName === 'clipping') {
+        badge.innerText = 'Clipping Frustum';
+        badge.className = 'panel-badge badge-persp';
+        perspCam.position.set(26, 24, 34);
+        controls.target.set(0, 4.0, -10);
+        frustumHelper.visible = true;
+        telePos.innerText = '(26.0, 24.0, 34.0)';
+        teleTarget.innerText = '(0.0, 4.0, -10.0)';
+        teleProj.innerText = 'Perspective (Frustum View)';
+        teleClip.innerText = 'Near: 4.0m | Far: 32.0m [Active Frustum]';
+        teleDepth.innerText = 'Active (24-bit Z-Test)';
+        teleDesc.innerText = 'The 6-plane viewing frustum clips all geometry outside boundary planes before rasterization, optimizing GPU performance and preventing buffer overflow.';
+      } else if (modeName === 'depth_error') {
+        if (activeBtn) activeBtn.classList.add('btn-err');
+        badge.innerText = 'Defect: Depth Buffer Disabled';
+        badge.className = 'panel-badge badge-error';
+        perspCam.position.set(-2, 3.2, 22);
+        controls.target.set(-2, 4.2, -15);
+        renderer.sortObjects = false;
+        fgTree.traverse(child => { if (child.isMesh) child.renderOrder = 1; });
+        bgPavilion.renderOrder = 2; // Rendered AFTER foreground tree!
+        bgPavilion.material.depthTest = false;
+        bgPavilion.material.depthWrite = false;
+        telePos.innerText = '(-2.0, 3.2, 22.0)';
+        teleTarget.innerText = '(-2.0, 4.2, -15.0)';
+        teleProj.innerText = 'Perspective (FOV: 55°)';
+        teleClip.innerText = 'Near: 0.5m | Far: 180m';
+        teleDepth.innerText = 'DISABLED (Painter Algorithm Failure)';
+        teleDesc.innerText = 'CRITICAL DEFECT: Distant purple pavilion is rendered after foreground tree with depthTest=false. Distant building erroneously overwrites near tree!';
+      } else if (modeName === 'depth_fixed') {
+        if (activeBtn) activeBtn.classList.add('btn-fix');
+        badge.innerText = 'Resolved: Z-Buffer Active';
+        badge.className = 'panel-badge badge-fixed';
+        perspCam.position.set(-2, 3.2, 22);
+        controls.target.set(-2, 4.2, -15);
+        renderer.sortObjects = true;
+        bgPavilion.material.depthTest = true;
+        bgPavilion.material.depthWrite = true;
+        telePos.innerText = '(-2.0, 3.2, 22.0)';
+        teleTarget.innerText = '(-2.0, 4.2, -15.0)';
+        teleProj.innerText = 'Perspective (FOV: 55°)';
+        teleClip.innerText = 'Near: 0.5m | Far: 180m';
+        teleDepth.innerText = 'Active (Hardware Z-Buffer Comparison)';
+        teleDesc.innerText = 'RESOLUTION: Hardware depth buffer compares z-depth per pixel. Incoming background fragments fail the z-test (z_bg > z_tree) and are properly discarded.';
+      }
+
+      controls.update();
+    };
+
+    // Button event listeners
+    document.getElementById('btn-overview').onclick = () => setMode('overview');
+    document.getElementById('btn-walkthrough').onclick = () => setMode('walkthrough');
+    document.getElementById('btn-perspective').onclick = () => setMode('perspective');
+    document.getElementById('btn-orthographic').onclick = () => setMode('orthographic');
+    document.getElementById('btn-clipping').onclick = () => setMode('clipping');
+    document.getElementById('btn-depth_error').onclick = () => setMode('depth_error');
+    document.getElementById('btn-depth_fixed').onclick = () => setMode('depth_fixed');
+
+    // Parse URL parameter
+    const urlParams = new URLSearchParams(window.location.search);
+    const initialMode = urlParams.get('mode') || 'overview';
+    setMode(initialMode);
+
+    // Responsive Resizing
+    window.addEventListener('resize', () => {
+      width = window.innerWidth;
+      height = window.innerHeight;
+      const aspect = width / height;
+
+      perspCam.aspect = aspect;
+      perspCam.updateProjectionMatrix();
+
+      orthoCam.left = -orthoDist * aspect;
+      orthoCam.right = orthoDist * aspect;
+      orthoCam.top = orthoDist;
+      orthoCam.bottom = -orthoDist;
+      orthoCam.updateProjectionMatrix();
+
+      renderer.setSize(width, height);
+      document.getElementById('tele-vp').innerText = `${width} × ${height}`;
+    });
+
+    // FPS Telemetry
+    let frameCount = 0;
+    let lastTime = performance.now();
+    const fpsElem = document.getElementById('tele-fps');
+
+    // Main Animation Loop
+    function animate(time) {
+      requestAnimationFrame(animate);
+
+      // Simple FPS counter
+      frameCount++;
+      if (time - lastTime >= 1000) {
+        fpsElem.innerText = Math.round((frameCount * 1000) / (time - lastTime)) + ' FPS';
+        frameCount = 0;
+        lastTime = time;
+      }
+
+      // Gentle fountain water animation
+      waterMesh.rotation.y = time * 0.0003;
+      tier2WaterMesh.rotation.y = -time * 0.0005;
+
+      controls.update();
+      renderer.render(scene, activeCamera);
+    }
+    animate(performance.now());
+  </script>
+</body>
+</html>
