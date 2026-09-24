@@ -1,6 +1,7 @@
 # Realistic Virtual Campus Exploration (Production-Grade Three.js)
 
-**Directory:** `s:\01_ACADEMIC_STUDY\UoPeople as Student\01_ACTIVE_COURSES\CS4406-Computer_Graphics\04_Unit 3_ Viewing and Projection\coursework\realistic_campus/`  
+🌐 **Live Deployed Simulation:** [https://itsmohamedyahia.github.io/cs4406-realistic-campus/](https://itsmohamedyahia.github.io/cs4406-realistic-campus/)  
+📦 **GitHub Repository:** [https://github.com/itsmohamedyahia/cs4406-realistic-campus](https://github.com/itsmohamedyahia/cs4406-realistic-campus)  
 **Entry File:** [`index.html`](file:///s:/01_ACADEMIC_STUDY/UoPeople%20as%20Student/01_ACTIVE_COURSES/CS4406-Computer_Graphics/04_Unit%203_%20Viewing%20and%20Projection/coursework/realistic_campus/index.html)  
 
 ---
